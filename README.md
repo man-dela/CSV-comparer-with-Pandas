@@ -1,5 +1,5 @@
 # CSV-comparer-with-Pandas
-## Using Pandas and Regex to try compare values in different Data Frames
+## Using Regex, .unique() and Fuzzywuzzy library to try compare values in different Data Frames
 > ### Read CSV files and convert them into a dataframe
 ```sh
 cms = pd.read_csv("GraphCMSDiagnoses.csv")
@@ -16,7 +16,8 @@ dcIcd = dc["icd10"].tolist()
 # convert items to dictonary as key:value (nan icd code:diagnosis)
 unknownIcd = dict(zip(dcIcd,dcDiagnosis))
  ```
-> ### Identify unique values in GraphCMS Diagnoses using a for loop
+> ## Solution 1
+> ### Identify unique values in GraphCMS Diagnoses using pandas .unique()
 Using the for loop values in each header are reiterated to identify unique values. These unique values are then placed in individual dataframes and later concancatenated in single dataframe.
 ```sh 
 for col in cms[["nameStd", "icd10"]]:
@@ -29,10 +30,7 @@ for col in cms[["nameStd", "icd10"]]:
     # concat each dataframe into single dataframe
     uniqueDf = pd.concat([dx, icd], axis=1)
 ```
-### Improvements to be made above
-- Identify unqiue diagnoses based on text. If in each value the text exists the value ceases to be unique and is removed in the dataframe
-- Accurately match the identified unique values to their appropriate ICD codes.
-
+> ## Solution 2
 > ### Identify newly matched Diagnoses and ICD codes from GraphCMS to the diagnoses in the Diagnosis Creator using regex
 ```sh
 for countID, diagnosis in unknownIcd.items():
@@ -41,4 +39,25 @@ for countID, diagnosis in unknownIcd.items():
         if m:
             match = m.group()
             f.write(diagnosis + "," + refIcd + "," + dx + "\n")
+```
+
+> ## Solution 3
+> ### use fuzzywuzzy library to match diagnosis based on the string using the [Levenshtein method](https://www.datacamp.com/community/tutorials/fuzzy-string-python)
+```sh
+dxList = []
+for refIcd, dx in knownIcd.items():
+    # logic for fuzzywuzzy
+    # get the dx and diagnosis which match higher than threshold eg. 80%
+    threshold = process.extractOne(dx,dcDiagnosis, scorer = fuzz.token_set_ratio)
+    if threshold[1] > 90:
+        # get diagnoses with scores > 90 and place dx, dcDiagnosis and icd into one item as a list
+        items = [dx,refIcd,str(threshold[0])]
+        # append items into one big list
+        dxList.append(items)
+
+# Create a dataframe
+matcheDx = pd.DataFrame(dxList, columns=["CMSDx", "ICD", "dcDx"])
+
+# write it into excel sheet 
+matcheDx.to_csv("matchedDx.csv")
 ```
